@@ -4,12 +4,12 @@ import struct
 from hashlib import sha256
 from math import ceil
 from time import time
-from typing import Sequence, Dict, Tuple, List, Any, TYPE_CHECKING
+from typing import Sequence, Dict, Tuple, List, Any, TYPE_CHECKING, Set
 
 from core import bytetools
 
 if TYPE_CHECKING:
-    from core.transaction import Transaction
+    from core.transaction import Transaction, CoinbaseTransaction, TransactionOutpoint
 
 
 class Block:
@@ -84,6 +84,43 @@ class Block:
     def check_proof(self) -> bool:
         # TODO: Implement variable difficulty by timestamps on mined blocks
         return self.id() < (bytes(4) + b'\xff' * 28)
+
+    def check_transactions(self) -> bool:
+        from core.transaction import TransactionOutpoint, CoinbaseTransaction
+
+        blocks = self.expand_chain()
+        transactions: Dict = {}
+        unspent_outpoints: Set[TransactionOutpoint] = set()
+
+        for block in blocks:
+            block_transactions = {}
+
+            for transaction in block.transactions:
+                amount_available = amount_spent = 0
+
+                for tx_input in transaction.inputs:
+                    try:
+                        ref_transaction = transactions[tx_input.outpoint.transaction_id]
+                        ref_output = ref_transaction.outputs[tx_input.outpoint.output_index]
+                        amount_available += ref_output.amount
+
+                        unspent_outpoints.remove(tx_input.outpoint)
+                    except KeyError:
+                        return False
+
+                for i, tx_output in enumerate(transaction.outputs):
+                    amount_spent += tx_output.amount
+
+                    unspent_outpoints.add(TransactionOutpoint(transaction.id(), i))
+
+                if amount_spent > amount_available and not isinstance(transaction, CoinbaseTransaction):
+                    return False
+
+                block_transactions[transaction.id()] = transaction
+
+            transactions |= block_transactions
+
+        return True
 
     @classmethod
     def from_bytes(cls, b: bytes, previous_block: Block) -> (bytes, Block):
