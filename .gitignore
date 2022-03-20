@@ -1,1 +1,10 @@
+# Environment files
+venv
+
+# Chain-specific data files
 data/wallets/*
+!data/wallets/.gitkeep
+data/blockchain.bin
+data/blockchain.json
+data/mempool.bin
+data/mempool.json

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import struct
+from collections import defaultdict
+from contextlib import suppress
 from hashlib import sha256
 from math import ceil
 from time import time
@@ -73,6 +75,44 @@ class Block:
             'transactions': tuple(transaction.json() for transaction in self.transactions)
         }
 
+    def unspent_outpoints(self, addresses: Sequence[bytes] = None) -> Set[TransactionOutpoint]:
+        assert addresses is None or all(isinstance(address, bytes) and len(address) == 8 for address in addresses), \
+            'Addresses must be a sequence of bytes[8].'
+
+        from core.transaction import TransactionOutpoint
+
+        transactions = self.expand_transactions()
+        unspent_outpoints: Set[TransactionOutpoint] = set()
+
+        for transaction in transactions.values():
+            for tx_input in transaction.inputs:
+                # KeyErrors are going to be raised in case that 'addresses' argument is provided
+                # This function should be executed only on checked blockchain, so suppressing the exception is safe
+                with suppress(KeyError):
+                    unspent_outpoints.remove(tx_input.outpoint)
+
+            for i, tx_output in enumerate(transaction.outputs):
+                if tx_output.address in addresses:
+                    unspent_outpoints.add(TransactionOutpoint(transaction.id(), i))
+
+        return unspent_outpoints
+
+    def balances(self, unspent_outpoints: Set[TransactionOutpoint]) -> Dict:
+        from core.transaction import TransactionOutpoint
+
+        assert isinstance(unspent_outpoints, set) \
+               and all(isinstance(outpoint, TransactionOutpoint) for outpoint in unspent_outpoints), \
+            'Unspent outpoints have to be a set of TransactionOutpoint instances.'
+
+        transactions = self.expand_transactions()
+        balances = defaultdict(lambda: 0)
+
+        for unspent_outpoint in unspent_outpoints:
+            tx_output = transactions[unspent_outpoint.transaction_id].outputs[unspent_outpoint.output_index]
+            balances[tx_output.address] += tx_output.amount
+
+        return balances
+
     def expand_chain(self) -> Tuple[Block]:
         blocks: List[Block] = [self]
 
@@ -81,11 +121,23 @@ class Block:
 
         return tuple(blocks[::-1])
 
+    def expand_transactions(self) -> Dict[bytes, Transaction]:
+        transactions = {}
+
+        for block in self.expand_chain():
+            for transaction in block.transactions:
+                transactions[transaction.id()] = transaction
+
+        return transactions
+
     def check_proof(self) -> bool:
-        # TODO: Implement variable difficulty by timestamps on mined blocks
+        # TODO: Should check for proof of linked blocks too
+
         return self.id() < (bytes(4) + b'\xff' * 28)
 
     def check_transactions(self) -> bool:
+        # TODO: Check that transactions are signed
+
         from core.transaction import TransactionOutpoint, CoinbaseTransaction
 
         blocks = self.expand_chain()
