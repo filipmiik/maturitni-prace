@@ -29,37 +29,34 @@ def transfer(
     print('Loading blockchain...')
 
     latest_block = BlockchainHelper.load_blockchain()
+    if latest_block is None:
+        print('Blockchain not yet initialized.')
+        return
 
     # Check if sending wallet has enough funds available
     print('Validating transaction...')
 
-    transactions = latest_block.expand_transactions()
     unspent_outpoints = latest_block.unspent_outpoints((from_wallet.address(),))
     balances = latest_block.balances(unspent_outpoints)
 
     if from_wallet.address() not in balances or balances[from_wallet.address()] < amount:
         raise ValueError('There are not enough funds available to execute this transaction.')
 
-    # Prepared UTXOs to be sorted by amount
-    prepared_outpoints = []
+    # Prepare UTXOs sorted by amount
+    unspent_outpoints = list(map(lambda op: (op[0], op[1].amount), unspent_outpoints.items()))
 
-    for outpoint in unspent_outpoints:
-        tx_output = transactions[outpoint.transaction_id].outputs[outpoint.output_index]
-        prepared_outpoints.append((tx_output.amount, outpoint))
+    unspent_outpoints.sort(key=lambda item: item[1])
+    reversed(unspent_outpoints)
 
-    prepared_outpoints.sort(key=lambda item: item[0])
-    reversed(prepared_outpoints)
-
-    # Combine prepared UTXOs to fit specified amount
+    # Combine UTXOs to fit specified amount
     prepared_amount = 0
     prepared_outpoints = []
 
     while prepared_amount < amount:
         outpoint = unspent_outpoints.pop()
-        tx_output = transactions[outpoint.transaction_id].outputs[outpoint.output_index]
 
-        prepared_amount += tx_output.amount
-        prepared_outpoints.append(outpoint)
+        prepared_amount += outpoint[1]
+        prepared_outpoints.append(outpoint[0])
 
     # Prepare the transaction inputs and outputs
     print('Creating transaction...')

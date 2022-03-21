@@ -6,12 +6,12 @@ from contextlib import suppress
 from hashlib import sha256
 from math import ceil
 from time import time
-from typing import Sequence, Dict, Tuple, List, Any, TYPE_CHECKING, Set
+from typing import Sequence, Dict, Tuple, List, Any, TYPE_CHECKING
 
 from core import bytetools
 
 if TYPE_CHECKING:
-    from core.transaction import Transaction, CoinbaseTransaction, TransactionOutpoint
+    from core.transaction import Transaction, CoinbaseTransaction, TransactionOutpoint, TransactionOutput
 
 
 class Block:
@@ -75,43 +75,78 @@ class Block:
             'transactions': tuple(transaction.json() for transaction in self.transactions)
         }
 
-    def unspent_outpoints(self, addresses: Sequence[bytes] = None) -> Set[TransactionOutpoint]:
+    def unspent_outpoints(self, addresses: Sequence[bytes] = None) -> Dict[TransactionOutpoint, TransactionOutput]:
         assert addresses is None or all(isinstance(address, bytes) and len(address) == 8 for address in addresses), \
             'Addresses must be a sequence of bytes[8].'
 
         from core.transaction import TransactionOutpoint
 
         transactions = self.expand_transactions()
-        unspent_outpoints: Set[TransactionOutpoint] = set()
+        unspent_outpoints: Dict[TransactionOutpoint, TransactionOutput] = {}
 
         for transaction in transactions.values():
             for tx_input in transaction.inputs:
                 # KeyErrors are going to be raised in case that 'addresses' argument is provided
                 # This function should be executed only on checked blockchain, so suppressing the exception is safe
                 with suppress(KeyError):
-                    unspent_outpoints.remove(tx_input.outpoint)
+                    del unspent_outpoints[tx_input.outpoint]
 
             for i, tx_output in enumerate(transaction.outputs):
-                if tx_output.address in addresses:
-                    unspent_outpoints.add(TransactionOutpoint(transaction.id(), i))
+                if addresses is None or tx_output.address in addresses:
+                    unspent_outpoints[TransactionOutpoint(transaction.id(), i)] = tx_output
 
         return unspent_outpoints
 
-    def balances(self, unspent_outpoints: Set[TransactionOutpoint]) -> Dict:
-        from core.transaction import TransactionOutpoint
+    def balances(self, unspent_outpoints: Dict[TransactionOutpoint, TransactionOutput]) -> Dict:
+        from core.transaction import TransactionOutpoint, TransactionOutput
 
-        assert isinstance(unspent_outpoints, set) \
-               and all(isinstance(outpoint, TransactionOutpoint) for outpoint in unspent_outpoints), \
-            'Unspent outpoints have to be a set of TransactionOutpoint instances.'
+        assert isinstance(unspent_outpoints, dict) \
+               and all(isinstance(outpoint, TransactionOutpoint) and isinstance(amount, TransactionOutput)
+                       for outpoint, amount in unspent_outpoints.items()), \
+            'Unspent outpoints have to be a Dict[TransactionOutpoint, TransactionOutput].'
 
-        transactions = self.expand_transactions()
         balances = defaultdict(lambda: 0)
 
-        for unspent_outpoint in unspent_outpoints:
-            tx_output = transactions[unspent_outpoint.transaction_id].outputs[unspent_outpoint.output_index]
+        for outpoint, tx_output in unspent_outpoints.items():
             balances[tx_output.address] += tx_output.amount
 
         return balances
+
+    def clone(self) -> Block:
+        block = Block(self.previous_block, self.transactions)
+        block.timestamp = self.timestamp
+        block.nonce = self.nonce
+
+        return block
+
+    def valid(self, shallow: bool = True) -> bool:
+        return self.valid_proof(shallow) and self.valid_transactions(shallow)
+
+    def valid_proof(self, shallow: bool = True) -> bool:
+        # Expand the blockchain to check all blocks if needed
+        blocks = (self,) if shallow else self.expand_chain()
+
+        # Iterate over blocks:
+        for block in blocks:
+            # Check if proof is valid
+            if block.id() >= (bytes(2) + b'\xff' * 30):
+                return False
+
+        return True
+
+    def valid_transactions(self, shallow: bool = True) -> bool:
+        # Expand the blockchain to check transactions per-block if needed
+        blocks = (self,) if shallow else self.expand_chain()
+
+        # Iterate over blocks
+        for block in blocks:
+            transactions = block.transactions
+
+            # Check if all transactions are valid
+            if any(not transaction.valid(block.previous_block) for transaction in transactions):
+                return False
+
+        return True
 
     def expand_chain(self) -> Tuple[Block]:
         blocks: List[Block] = [self]
@@ -129,50 +164,6 @@ class Block:
                 transactions[transaction.id()] = transaction
 
         return transactions
-
-    def check_proof(self) -> bool:
-        # TODO: Should check for proof of linked blocks too
-
-        return self.id() < (bytes(4) + b'\xff' * 28)
-
-    def check_transactions(self) -> bool:
-        # TODO: Check that transactions are signed
-
-        from core.transaction import TransactionOutpoint, CoinbaseTransaction
-
-        blocks = self.expand_chain()
-        transactions: Dict = {}
-        unspent_outpoints: Set[TransactionOutpoint] = set()
-
-        for block in blocks:
-            block_transactions = {}
-
-            for transaction in block.transactions:
-                amount_available = amount_spent = 0
-
-                for tx_input in transaction.inputs:
-                    try:
-                        ref_transaction = transactions[tx_input.outpoint.transaction_id]
-                        ref_output = ref_transaction.outputs[tx_input.outpoint.output_index]
-                        amount_available += ref_output.amount
-
-                        unspent_outpoints.remove(tx_input.outpoint)
-                    except KeyError:
-                        return False
-
-                for i, tx_output in enumerate(transaction.outputs):
-                    amount_spent += tx_output.amount
-
-                    unspent_outpoints.add(TransactionOutpoint(transaction.id(), i))
-
-                if amount_spent > amount_available and not isinstance(transaction, CoinbaseTransaction):
-                    return False
-
-                block_transactions[transaction.id()] = transaction
-
-            transactions |= block_transactions
-
-        return True
 
     @classmethod
     def from_bytes(cls, b: bytes, previous_block: Block) -> (bytes, Block):

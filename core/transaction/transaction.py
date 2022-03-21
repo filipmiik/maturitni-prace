@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import struct
+from functools import reduce
 from hashlib import sha256
 from math import ceil
 from time import time
 from typing import TYPE_CHECKING, Sequence, SupportsBytes, List, Dict, Tuple, Any
 
 from .. import bytetools
+from ..block import Block
 
 if TYPE_CHECKING:
     from .transaction_input import TransactionInput
@@ -73,6 +75,48 @@ class Transaction(SupportsBytes):
             'This wallet has already signed this transaction.'
 
         self.signatures.append(signature)
+
+    def valid(self, latest_block: Block | None) -> bool:
+        assert latest_block is None or isinstance(latest_block, Block), \
+            'Latest block must be an instance of Block or None.'
+
+        # Get unspent outpoints
+        unspent_outpoints = latest_block.unspent_outpoints() if isinstance(latest_block, Block) else {}
+
+        # Check if spending only unspent outpoints and count total available amount
+        total_available = 0
+
+        for tx_input in self.inputs:
+            try:
+                total_available += unspent_outpoints[tx_input.outpoint].amount
+                del unspent_outpoints[tx_input.outpoint]
+            except KeyError:
+                return False
+
+        # Calculate total spent amount
+        total_spent = reduce(lambda acc, curr: acc + curr.amount, self.outputs, 0)
+
+        # Check if spent amount is not greater than available amount and that all inputs are signed
+        return total_available >= total_spent and self._signed(latest_block)
+
+    def _signed(self, latest_block: Block | None) -> bool:
+        assert latest_block is None or isinstance(latest_block, Block), \
+            'Latest block must be an instance of Block or None.'
+
+        # Get transactions
+        transactions = latest_block.expand_transactions() if isinstance(latest_block, Block) else {}
+
+        # Get signed addresses
+        signed_addresses = list(signature.wallet.address() for signature in self.signatures)
+
+        # Check if all signed
+        for tx_input in self.inputs:
+            address = transactions[tx_input.outpoint.transaction_id].outputs[tx_input.outpoint.output_index].address
+
+            if address not in signed_addresses:
+                return False
+
+        return True
 
     @classmethod
     def from_bytes(cls, b: bytes) -> (bytes, Transaction):

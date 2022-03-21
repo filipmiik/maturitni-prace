@@ -5,11 +5,19 @@ import struct
 from .transaction import Transaction
 from .transaction_output import TransactionOutput
 from .. import bytetools
+from ..block import Block
 
 
 class CoinbaseTransaction(Transaction):
     def __init__(self, address: bytes):
         super().__init__([], [TransactionOutput(address, 10)])
+
+    def valid(self, latest_block: Block | None) -> bool:
+        assert latest_block is None or isinstance(latest_block, Block), \
+            'Latest block must be an instance of Block or None.'
+
+        # Coinbase transaction is always valid
+        return True
 
     @classmethod
     def from_bytes(cls, b: bytes) -> (bytes, CoinbaseTransaction):

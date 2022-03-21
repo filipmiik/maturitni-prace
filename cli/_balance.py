@@ -20,9 +20,11 @@ def balance(
     print('Loading blockchain...')
 
     latest_block = BlockchainHelper.load_blockchain()
+    if latest_block is None:
+        print('Blockchain not yet initialized.')
+        return
 
     # Calculate balances from unspent outpoints
-    transactions = latest_block.expand_transactions()
     unspent_outpoints = latest_block.unspent_outpoints((wallet.address(),))
     balances = latest_block.balances(unspent_outpoints)
 
@@ -30,7 +32,5 @@ def balance(
     print(f'\nCurrent balance for {wallet.address().hex()}: {balances[wallet.address()]}\nUnspent outpoints:')
 
     # Iterate over unspent outpoints and print out it's amount
-    for unspent_outpoint in unspent_outpoints:
-        tx_output = transactions[unspent_outpoint.transaction_id].outputs[unspent_outpoint.output_index]
-
+    for unspent_outpoint, tx_output in unspent_outpoints.items():
         print(f'- {unspent_outpoint.transaction_id.hex()}[{unspent_outpoint.output_index}]: {tx_output.amount}')

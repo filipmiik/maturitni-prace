@@ -35,6 +35,13 @@ class GenesisBlock(Block):
             'transactions': tuple(transaction.json() for transaction in self.transactions)
         }
 
+    def clone(self) -> GenesisBlock:
+        block = GenesisBlock(self.transactions)
+        block.timestamp = self.timestamp
+        block.nonce = self.nonce
+
+        return block
+
     @classmethod
     def from_bytes(cls, b: bytes, previous_block: None) -> (bytes, GenesisBlock):
         from core.transaction import Transaction
