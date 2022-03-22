@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import SupportsBytes, Dict, Any
+from typing import Dict, Any, Tuple
 
 from .transaction_outpoint import TransactionOutpoint
 
 
-class TransactionInput(SupportsBytes):
+class TransactionInput:
     def __init__(self, outpoint: TransactionOutpoint):
         """
         Create a transaction input referencing a transaction outpoint.
@@ -14,7 +14,7 @@ class TransactionInput(SupportsBytes):
         """
 
         assert isinstance(outpoint, TransactionOutpoint), \
-            'Provided `outpoint` argument has to be an instance of TransactionOutpoint.'
+            'Argument `outpoint` has to be an instance of TransactionOutpoint.'
 
         self.outpoint = outpoint
 
@@ -27,13 +27,27 @@ class TransactionInput(SupportsBytes):
     def __hash__(self):
         return hash(self.__bytes__())
 
-    def json(self) -> Dict:
+    def json(self) -> Dict[str, Any]:
+        """
+        Get the serialized transaction input dumpable to JSON.
+
+        :return: a dictionary containing all information about this input
+        """
+
         return {
             'outpoint': self.outpoint.json()
         }
 
     @classmethod
-    def from_bytes(cls, b: bytes) -> (bytes, TransactionInput):
+    def from_bytes(cls, b: bytes) -> Tuple[bytes, TransactionInput]:
+        """
+        Deserialize a transaction input from provided bytes.
+
+        :param b: the serialized input bytes
+        :return: a tuple containing the remaining bytes and the input
+        """
+
+        # TODO: Refactor and change some assertions into exceptions due to user input
         assert isinstance(b, bytes), \
             'Provided `b` argument has to be of type bytes.'
 

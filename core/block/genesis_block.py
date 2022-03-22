@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import struct
-from typing import Sequence, Dict, TYPE_CHECKING
+from typing import Sequence, Dict, TYPE_CHECKING, Tuple, Any
 
 from .block import Block
-from .. import bytetools
+from ..helpers.bytes import BytesHelper
 
 if TYPE_CHECKING:
     from core.transaction import Transaction
@@ -15,6 +15,12 @@ class GenesisBlock(Block):
         super().__init__(None, transactions)
 
     def block_header(self) -> bytes:
+        """
+        Get the serialized block header.
+
+        :return: the serialized block header
+        """
+
         from core.transaction import Transaction
 
         return b''.join([
@@ -24,7 +30,13 @@ class GenesisBlock(Block):
             struct.pack('>q', self.nonce)
         ])
 
-    def json(self) -> Dict:
+    def json(self) -> Dict[str, Any]:
+        """
+        Get the serialized block dumpable to JSON.
+
+        :return: a dictionary containing all information about this block
+        """
+
         from core.transaction import Transaction
 
         return {
@@ -35,17 +47,19 @@ class GenesisBlock(Block):
             'transactions': tuple(transaction.json() for transaction in self.transactions)
         }
 
-    def clone(self) -> GenesisBlock:
-        block = GenesisBlock(self.transactions)
-        block.timestamp = self.timestamp
-        block.nonce = self.nonce
-
-        return block
-
     @classmethod
-    def from_bytes(cls, b: bytes, previous_block: None) -> (bytes, GenesisBlock):
+    def from_bytes(cls, b: bytes, previous_block: None = None) -> Tuple[bytes, GenesisBlock]:
+        """
+        Deserialize a genesis block from provided bytes.
+
+        :param b: the serialized genesis block bytes
+        :param previous_block: None
+        :return: a tuple containing the remaining bytes and the deserialized genesis block
+        """
+
         from core.transaction import Transaction
 
+        # TODO: Refactor and change some assertions into exceptions due to user input
         assert isinstance(b, bytes), \
             'Provided `b` argument has to be of type bytes.'
 
@@ -58,7 +72,7 @@ class GenesisBlock(Block):
         b, timestamp = b[8:], struct.unpack('>q', b[:8])[0]
         b, nonce = b[8:], struct.unpack('>q', b[:8])[0]
 
-        b, transactions = bytetools.array_from_bytes(b, Transaction)
+        b, transactions = BytesHelper.to_array(b, Transaction)
 
         assert merkle_root == Transaction.calculate_merkle_root(transactions), \
             'Calculated merkle root from parsed transactions has to match parsed merkle root.'
@@ -71,11 +85,20 @@ class GenesisBlock(Block):
 
     @classmethod
     def from_bytes_chain(cls, b: bytes) -> Block:
-        assert isinstance(b, bytes), \
-            'Provided `b` argument has to be of type bytes.'
+        """
+        Deserialize an expanded blockchain from provided bytes..
 
+        :param b: the serialized blockchain bytes
+        :return: an instance of the latest block in the blockchain
+        """
+
+        assert isinstance(b, bytes), \
+            'Argument `b` has to be of type bytes.'
+
+        # Deserialize first block as a genesis block
         b, block = cls.from_bytes(b, None)
 
+        # Loop and deserialize bytes until there are no left
         while len(b) > 0:
             b, block = Block.from_bytes(b, block)
 

@@ -1,5 +1,5 @@
-from .transaction import Transaction
 from .coinbase_transaction import CoinbaseTransaction
+from .transaction import Transaction
 from .transaction_input import TransactionInput
 from .transaction_outpoint import TransactionOutpoint
 from .transaction_output import TransactionOutput

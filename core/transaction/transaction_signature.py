@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import SupportsBytes, Dict, Any
+from typing import Dict, Any, Tuple
 
 from core.wallet import Wallet
 
 
-class TransactionSignature(SupportsBytes):
+class TransactionSignature:
     def __init__(self, wallet: Wallet, signature: bytes):
         """
         Create a transaction signature with provided wallet and signature (SHA256(signed transaction ID)).
@@ -15,9 +15,9 @@ class TransactionSignature(SupportsBytes):
         """
 
         assert isinstance(wallet, Wallet), \
-            'Provided `wallet` argument has to be instance of Wallet.'
+            'Argument `wallet` has to be an instance of Wallet.'
         assert isinstance(signature, bytes) and len(signature) == 32, \
-            'Provided `signature` argument has to be of type bytes[32].'
+            'Argument `signature` has to be of type bytes[32].'
 
         self.wallet = wallet
         self.signature = signature
@@ -31,14 +31,28 @@ class TransactionSignature(SupportsBytes):
     def __hash__(self):
         return hash(self.__bytes__())
 
-    def json(self) -> Dict:
+    def json(self) -> Dict[str, Any]:
+        """
+        Get the serialized transaction signature dumpable to JSON.
+
+        :return: a dictionary containing all information about this signature
+        """
+
         return {
             'script': bytes(self.wallet).hex(),
             'signature': self.signature.hex()
         }
 
     @classmethod
-    def from_bytes(cls, b: bytes) -> (bytes, TransactionSignature):
+    def from_bytes(cls, b: bytes) -> Tuple[bytes, TransactionSignature]:
+        """
+        Deserialize a transaction signature from provided bytes.
+
+        :param b: the serialized signature bytes
+        :return: a tuple containing the remaining bytes and the signature
+        """
+
+        # TODO: Refactor and change some assertions into exceptions due to user input
         assert isinstance(b, bytes), \
             'Provided `b` argument has to be of type bytes.'
         assert len(b) >= 526 + 32, \

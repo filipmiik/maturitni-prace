@@ -4,7 +4,7 @@ import errno
 import os
 import sys
 from hashlib import sha256
-from typing import TYPE_CHECKING, SupportsBytes
+from typing import TYPE_CHECKING
 
 from cryptography.hazmat.backends import default_backend as crypto_default_backend
 from cryptography.hazmat.primitives import hashes
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from core.transaction import Transaction, TransactionSignature
 
 
-class Wallet(SupportsBytes):
+class Wallet:
     def __init__(self, private_key: RSAPrivateKey):
         """
         Create Wallet instance with private key (private key ~ Wallet).
@@ -26,7 +26,7 @@ class Wallet(SupportsBytes):
         """
 
         assert isinstance(private_key, RSAPrivateKey), \
-            'Private key must be an instance of RSAPrivateKey.'
+            'Argument `private_key` has to be an instance of RSAPrivateKey.'
 
         self._private_key = private_key
 
@@ -40,12 +40,24 @@ class Wallet(SupportsBytes):
         return hash(self.__bytes__())
 
     def address(self) -> bytes:
+        """
+        Calculate the wallet's address.
+
+        :return: the first 8 bytes of the hash digest of the wallet's public representation
+        """
+
         return sha256(self.__bytes__()).digest()[:8]
 
     def public_key(self) -> RSAPublicKey:
+        """
+        Export the wallet's public key.
+
+        :return: the public key derived from stored private key
+        """
+
         return self._private_key.public_key()
 
-    def save(self):
+    def save(self) -> None:
         """
         Save the wallet into the registry.
 
@@ -76,9 +88,9 @@ class Wallet(SupportsBytes):
         except Exception:
             raise RuntimeError(f'Failed to save wallet {address} to the registry.')
 
-    def sign_transaction(self, transaction: Transaction):
+    def sign_transaction(self, transaction: Transaction) -> None:
         """
-        Sign a transaction using by private key stored in this Wallet.
+        Sign a transaction using private key stored in this Wallet.
 
         :param transaction: the transaction to be signer
         """
@@ -86,7 +98,7 @@ class Wallet(SupportsBytes):
         from core.transaction import Transaction, TransactionSignature
 
         assert isinstance(transaction, Transaction), \
-            'Provided `transaction` argument must be an instance of Transaction.'
+            'Argument `transaction` has to be an instance of Transaction.'
 
         # Create the signature from store private key and SHA256(transaction)
         signature = self._private_key.sign(
@@ -102,7 +114,7 @@ class Wallet(SupportsBytes):
         # Sign the transaction with just created signature and this wallet
         transaction.sign(TransactionSignature(self, signature))
 
-    def _create_wallet_directory(self):
+    def _create_wallet_directory(self) -> None:
         """
         Create wallet directory in the registry. The wallet directory name will match the wallet address.
         """
@@ -147,7 +159,7 @@ class Wallet(SupportsBytes):
         """
 
         assert isinstance(address, bytes) and len(address) == 8, \
-            'Wallet address must be valid bytes[8].'
+            'Argument `address` has to be of type bytes[8].'
 
         try:
             # Try to load the private key from registry
@@ -172,6 +184,13 @@ class Wallet(SupportsBytes):
 
     @classmethod
     def load_by_script(cls, script: bytes) -> Wallet:
+        """
+        Safely load wallet by public wallet representation from the registry.
+
+        :param script: the wallet's representation in bytes
+        :return: the loaded wallet
+        """
+
         address = sha256(script).digest()[:8]
 
         return cls.load_from_address(address)

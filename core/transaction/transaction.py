@@ -5,18 +5,16 @@ from functools import reduce
 from hashlib import sha256
 from math import ceil
 from time import time
-from typing import TYPE_CHECKING, Sequence, SupportsBytes, List, Dict, Tuple, Any
-
-from .. import bytetools
-from ..block import Block
+from typing import TYPE_CHECKING, Sequence, List, Dict, Tuple, Any, Iterable
 
 if TYPE_CHECKING:
+    from core.block import Block
     from .transaction_input import TransactionInput
     from .transaction_output import TransactionOutput
     from .transaction_signature import TransactionSignature
 
 
-class Transaction(SupportsBytes):
+class Transaction:
     def __init__(self, inputs: Sequence[TransactionInput], outputs: Sequence[TransactionOutput]):
         """
         Create a transaction from inputs and outputs.
@@ -31,9 +29,9 @@ class Transaction(SupportsBytes):
 
         assert (len(inputs) > 0 or isinstance(self, CoinbaseTransaction)) \
                and all(isinstance(tx_input, TransactionInput) for tx_input in inputs), \
-            'Provided `inputs` argument has to be a sequence of instances of TransactionInput with length > 0.'
+            'Argument `inputs` has to be a sequence of TransactionInput instances with length > 0.'
         assert all(isinstance(tx_output, TransactionOutput) for tx_output in outputs), \
-            'Provided `outputs` argument has to be a sequence of instanceof of TransactionOutput.'
+            'Argument `outputs` has to be a sequence of TransactionOutput instances.'
 
         self.inputs: Tuple[TransactionInput] = tuple(inputs)
         self.outputs: Tuple[TransactionOutput] = tuple(outputs)
@@ -42,11 +40,13 @@ class Transaction(SupportsBytes):
         self.timestamp = ceil(time() * 1e3)
 
     def __bytes__(self):
+        from core.helpers import BytesHelper
+
         return b''.join([
             struct.pack('>q', self.timestamp),
-            bytetools.bytes_from_array(self.inputs),
-            bytetools.bytes_from_array(self.outputs),
-            bytetools.bytes_from_array(self.signatures),
+            BytesHelper.from_array(self.inputs),
+            BytesHelper.from_array(self.outputs),
+            BytesHelper.from_array(self.signatures),
         ])
 
     def __eq__(self, other: Any):
@@ -58,7 +58,13 @@ class Transaction(SupportsBytes):
     def id(self) -> bytes:
         return sha256(self.__bytes__()).digest()
 
-    def json(self) -> Dict:
+    def json(self) -> Dict[str, Any]:
+        """
+        Get the serialized transaction dumpable to JSON.
+
+        :return: a dictionary containing all information about this transaction
+        """
+
         return {
             'inputs': tuple(tx_input.json() for tx_input in self.inputs),
             'outputs': tuple(tx_output.json() for tx_output in self.outputs),
@@ -66,19 +72,33 @@ class Transaction(SupportsBytes):
             'timestamp': self.timestamp,
         }
 
-    def sign(self, signature: TransactionSignature):
+    def sign(self, signature: TransactionSignature) -> None:
+        """
+        Add signature to this transaction.
+
+        :param signature: the signature
+        """
+
         from .transaction_signature import TransactionSignature
 
         assert isinstance(signature, TransactionSignature), \
-            'Provided `signature` argument has to be an instance of TransactionSignature.'
+            'Argument `signature` has to be an instance of TransactionSignature.'
         assert not any(tx_signature.wallet == signature.wallet for tx_signature in self.signatures), \
             'This wallet has already signed this transaction.'
 
         self.signatures.append(signature)
 
     def valid(self, latest_block: Block | None) -> bool:
+        """
+        Check if this transaction is valid in blockchain defined by it's latest block.
+
+        :param latest_block: the latest block of the checked blockchain or None
+        """
+
+        from core.block import Block
+
         assert latest_block is None or isinstance(latest_block, Block), \
-            'Latest block must be an instance of Block or None.'
+            'Argument `latest_block` has to be an instance of Block or None.'
 
         # Get unspent outpoints
         unspent_outpoints = latest_block.unspent_outpoints() if isinstance(latest_block, Block) else {}
@@ -100,8 +120,16 @@ class Transaction(SupportsBytes):
         return total_available >= total_spent and self._signed(latest_block)
 
     def _signed(self, latest_block: Block | None) -> bool:
+        """
+        Check if all transactions in this block are signed by their right addresses.
+
+        :param latest_block: the latest block of the blockchain or None
+        """
+
+        from core.block import Block
+
         assert latest_block is None or isinstance(latest_block, Block), \
-            'Latest block must be an instance of Block or None.'
+            'Argument `latest_block` has to be an instance of Block or None.'
 
         # Get transactions
         transactions = latest_block.expand_transactions() if isinstance(latest_block, Block) else {}
@@ -119,20 +147,29 @@ class Transaction(SupportsBytes):
         return True
 
     @classmethod
-    def from_bytes(cls, b: bytes) -> (bytes, Transaction):
+    def from_bytes(cls, b: bytes) -> Tuple[bytes, Transaction]:
+        """
+        Deserialize a transaction from provided bytes.
+
+        :param b: the serialized transaction bytes
+        :return: a tuple containing the remaining bytes and the transaction
+        """
+
         from .transaction_input import TransactionInput
         from .transaction_output import TransactionOutput
         from .transaction_signature import TransactionSignature
         from . import CoinbaseTransaction
+        from core.helpers import BytesHelper
 
+        # TODO: Refactor and change some assertions into exceptions due to user input
         assert isinstance(b, bytes), \
             'Provided `b` argument has to be of type bytes.'
 
         b, timestamp = b[8:], struct.unpack('>q', b[:8])[0]
 
-        b, inputs = bytetools.array_from_bytes(b, TransactionInput)
-        b, outputs = bytetools.array_from_bytes(b, TransactionOutput)
-        b, signatures = bytetools.array_from_bytes(b, TransactionSignature)
+        b, inputs = BytesHelper.to_array(b, TransactionInput)
+        b, outputs = BytesHelper.to_array(b, TransactionOutput)
+        b, signatures = BytesHelper.to_array(b, TransactionSignature)
 
         transaction = CoinbaseTransaction(outputs[0].address) if len(inputs) == 0 else Transaction(inputs, outputs)
         transaction.signatures = signatures
@@ -141,5 +178,14 @@ class Transaction(SupportsBytes):
         return b, transaction
 
     @staticmethod
-    def calculate_merkle_root(transactions: Sequence[Transaction]) -> bytes:
-        return bytetools.calculate_merkle_root([transaction.id() for transaction in transactions])
+    def calculate_merkle_root(transactions: Iterable[Transaction]) -> bytes:
+        """
+        Calculate merkle root from transaction IDs of provided transactions.
+
+        :param transactions: the transactions to calculate merkle root from
+        :return: the hash digest of the merkle root
+        """
+
+        from core.helpers import HashHelper
+
+        return HashHelper.calculate_merkle_root(transaction.id() for transaction in transactions)

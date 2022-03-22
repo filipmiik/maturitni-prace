@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import struct
-from typing import SupportsBytes, Dict, Any
+from typing import Dict, Any, Tuple
 
 
-class TransactionOutpoint(SupportsBytes):
+class TransactionOutpoint:
     def __init__(self, transaction_id: bytes, output_index: int):
         """
         Create representation of transaction outpoint consisting of transaction and specific output of that transaction.
@@ -14,9 +14,9 @@ class TransactionOutpoint(SupportsBytes):
         """
 
         assert isinstance(transaction_id, bytes) and len(transaction_id) == 32, \
-            'Provided `transaction_id` argument has to be of type bytes[32].'
+            'Argument `transaction_id` has to be of type bytes[32].'
         assert isinstance(output_index, int) and output_index >= 0, \
-            'Provided `output_index` argument has to be a positive integer or 0.'
+            'Argument `output_index` has to be of type int greater or equal to zero.'
 
         self.transaction_id = transaction_id
         self.output_index = output_index
@@ -30,14 +30,28 @@ class TransactionOutpoint(SupportsBytes):
     def __hash__(self):
         return hash(self.__bytes__())
 
-    def json(self) -> Dict:
+    def json(self) -> Dict[str, Any]:
+        """
+        Get the serialized transaction outpoint dumpable to JSON.
+
+        :return: a dictionary containing all information about this outpoint
+        """
+
         return {
             'transaction_id': self.transaction_id.hex(),
             'output_index': self.output_index
         }
 
     @classmethod
-    def from_bytes(cls, b: bytes) -> (bytes, TransactionOutpoint):
+    def from_bytes(cls, b: bytes) -> Tuple[bytes, TransactionOutpoint]:
+        """
+        Deserialize a transaction outpoint from provided bytes.
+
+        :param b: the serialized outpoint bytes
+        :return: a tuple containing the remaining bytes and the outpoint
+        """
+
+        # TODO: Refactor and change some assertions into exceptions due to user input
         assert isinstance(b, bytes), \
             'Provided `b` argument has to be of type bytes.'
         assert len(b) >= 32 + 2, \

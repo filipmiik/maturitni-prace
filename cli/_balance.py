@@ -1,6 +1,7 @@
 import typer
 
-from core.helper import BlockchainHelper
+from core.block import Block
+from core.helpers import BlockchainHelper
 from ._app import app
 from ._helper import CLIHelper
 
@@ -26,7 +27,7 @@ def balance(
 
     # Calculate balances from unspent outpoints
     unspent_outpoints = latest_block.unspent_outpoints((wallet.address(),))
-    balances = latest_block.balances(unspent_outpoints)
+    balances = Block.sum_unspent_outpoints(unspent_outpoints)
 
     # Print current balance
     print(f'\nCurrent balance for {wallet.address().hex()}: {balances[wallet.address()]}\nUnspent outpoints:')

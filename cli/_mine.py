@@ -1,7 +1,7 @@
 import typer
 
 from core.block import Block
-from core.helper import BlockchainHelper
+from core.helpers import BlockchainHelper
 from core.transaction import Transaction
 from ._app import app
 from ._helper import CLIHelper
@@ -30,7 +30,7 @@ def mine(
     if isinstance(mined_block, Block):
         # Save the blockchain
         BlockchainHelper.save_blockchain(mined_block)
-        BlockchainHelper.export_blockchain('json', mined_block)
+        BlockchainHelper.export_blockchain(mined_block)
 
         # TODO: Remove processed transactions from mempool
 

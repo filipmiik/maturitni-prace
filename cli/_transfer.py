@@ -2,7 +2,8 @@ from datetime import datetime
 
 import typer
 
-from core.helper import BlockchainHelper, TransactionHelper
+from core.block import Block
+from core.helpers import BlockchainHelper, TransactionHelper
 from core.transaction import TransactionInput, TransactionOutput, Transaction
 from ._app import app
 from ._helper import CLIHelper
@@ -37,7 +38,7 @@ def transfer(
     print('Validating transaction...')
 
     unspent_outpoints = latest_block.unspent_outpoints((from_wallet.address(),))
-    balances = latest_block.balances(unspent_outpoints)
+    balances = Block.sum_unspent_outpoints(unspent_outpoints)
 
     if from_wallet.address() not in balances or balances[from_wallet.address()] < amount:
         raise ValueError('There are not enough funds available to execute this transaction.')
