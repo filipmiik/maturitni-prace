@@ -246,24 +246,23 @@ class Block:
 
         from core.transaction import Transaction
 
-        # TODO: Refactor and change some assertions into exceptions due to user input
-        assert isinstance(b, bytes), \
-            'Provided `b` argument has to be of type bytes.'
+        with BytesHelper.load_safe(b):
+            # Load previous block ID
+            b, previous_block_id = BytesHelper.load_raw_data(b, 32)
 
-        b, previous_block_id = b[32:], b[:32]
+            if previous_block_id != previous_block.id():
+                raise ValueError('Loaded previous block ID has to match provided previous block ID.')
 
-        assert previous_block.id() == previous_block_id, \
-            'Provided `previous_block` has to match previous block ID from `b` bytes.'
+            # Load other block properties
+            b, merkle_root = BytesHelper.load_raw_data(b, 32)
+            b, timestamp = b[8:], struct.unpack('>q', b[:8])[0]
+            b, nonce = b[8:], struct.unpack('>q', b[:8])[0]
+            b, transactions = BytesHelper.to_array(b, Transaction)
 
-        b, merkle_root = b[32:], b[:32]
-        b, timestamp = b[8:], struct.unpack('>q', b[:8])[0]
-        b, nonce = b[8:], struct.unpack('>q', b[:8])[0]
+            if merkle_root != Transaction.calculate_merkle_root(transactions):
+                raise ValueError('Loaded merkle root has to match calculated merkle root.')
 
-        b, transactions = BytesHelper.to_array(b, Transaction)
-
-        assert merkle_root == Transaction.calculate_merkle_root(transactions), \
-            'Calculated merkle root from parsed transactions has to match parsed merkle root.'
-
+        # Create the new block
         block = Block(previous_block, transactions)
         block.timestamp = timestamp
         block.nonce = nonce

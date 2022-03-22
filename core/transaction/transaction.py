@@ -161,16 +161,14 @@ class Transaction:
         from . import CoinbaseTransaction
         from core.helpers import BytesHelper
 
-        # TODO: Refactor and change some assertions into exceptions due to user input
-        assert isinstance(b, bytes), \
-            'Provided `b` argument has to be of type bytes.'
+        with BytesHelper.load_safe(b):
+            # Load transaction properties
+            b, timestamp = b[8:], struct.unpack('>q', b[:8])[0]
+            b, inputs = BytesHelper.to_array(b, TransactionInput)
+            b, outputs = BytesHelper.to_array(b, TransactionOutput)
+            b, signatures = BytesHelper.to_array(b, TransactionSignature)
 
-        b, timestamp = b[8:], struct.unpack('>q', b[:8])[0]
-
-        b, inputs = BytesHelper.to_array(b, TransactionInput)
-        b, outputs = BytesHelper.to_array(b, TransactionOutput)
-        b, signatures = BytesHelper.to_array(b, TransactionSignature)
-
+        # Create the transaction
         transaction = CoinbaseTransaction(outputs[0].address) if len(inputs) == 0 else Transaction(inputs, outputs)
         transaction.signatures = signatures
         transaction.timestamp = timestamp

@@ -47,10 +47,9 @@ class TransactionInput:
         :return: a tuple containing the remaining bytes and the input
         """
 
-        # TODO: Refactor and change some assertions into exceptions due to user input
-        assert isinstance(b, bytes), \
-            'Provided `b` argument has to be of type bytes.'
+        from ..helpers import BytesHelper
 
-        b, outpoint = TransactionOutpoint.from_bytes(b)
+        with BytesHelper.load_safe(b):
+            b, outpoint = TransactionOutpoint.from_bytes(b)
 
         return b, TransactionInput(outpoint)

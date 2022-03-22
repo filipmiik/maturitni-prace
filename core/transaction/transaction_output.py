@@ -51,13 +51,10 @@ class TransactionOutput:
         :return: a tuple containing the remaining bytes and the output
         """
 
-        # TODO: Refactor and change some assertions into exceptions due to user input
-        assert isinstance(b, bytes), \
-            'Provided `b` argument has to be of type bytes.'
-        assert len(b) >= 8 + 4, \
-            'Provided `b` argument cannot be deserialized.'
+        from core.helpers import BytesHelper
 
-        b, address = b[8:], b[:8]
-        b, amount = b[4:], struct.unpack('>f', b[:4])[0]
+        with BytesHelper.load_safe(b):
+            b, address = BytesHelper.load_raw_data(b, 8)
+            b, amount = b[4:], struct.unpack('>f', b[:4])[0]
 
         return b, TransactionOutput(address, amount)

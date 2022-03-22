@@ -52,15 +52,12 @@ class TransactionSignature:
         :return: a tuple containing the remaining bytes and the signature
         """
 
-        # TODO: Refactor and change some assertions into exceptions due to user input
-        assert isinstance(b, bytes), \
-            'Provided `b` argument has to be of type bytes.'
-        assert len(b) >= 526 + 32, \
-            'Provided `b` argument cannot be deserialized.'
+        from core.helpers import BytesHelper
 
-        b, script = b[526:], b[:526]
-        b, signature = b[32:], b[:32]
+        with BytesHelper.load_safe(b):
+            b, script = BytesHelper.load_raw_data(b, 526)
+            b, signature = BytesHelper.load_raw_data(b, 32)
 
-        wallet = Wallet.load_by_script(script)
+            wallet = Wallet.load_by_script(script)
 
         return b, TransactionSignature(wallet, signature)

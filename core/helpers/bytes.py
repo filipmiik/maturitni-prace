@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import struct
 from typing import runtime_checkable, Protocol, TypeVar, Tuple, SupportsBytes, List, Iterable, Type
 
@@ -15,6 +16,37 @@ T = TypeVar('T', bound=SupportsFromBytes)
 
 
 class BytesHelper:
+    @staticmethod
+    @contextlib.contextmanager
+    def load_safe(b: bytes) -> None:
+        assert isinstance(b, bytes), \
+            'Argument `b` has to be of type bytes.'
+
+        try:
+            yield
+        except struct.error:
+            raise ValueError('Could not load valid data from provided byte sequence.')
+
+    @staticmethod
+    def load_raw_data(b: bytes, size: int) -> Tuple[bytes, bytes]:
+        """
+        Safely load raw bytes from provided byte sequence.
+
+        :param b: the byte sequence
+        :param size: the length to load from the byte sequence (in bytes)
+        :return: a tuple of remaining bytes and the loaded bytes
+        """
+
+        assert isinstance(b, bytes), \
+            'Argument `b` has to be of type bytes.'
+        assert isinstance(size, int) and size > 0, \
+            'Argument `size` has to be of type int greater than zero.'
+
+        if len(b) < size:
+            raise ValueError('Could not load required length of raw data from provided byte sequence.')
+
+        return b[size:], b[:size]
+
     @staticmethod
     def to_array(b: bytes, cls: Type[T]) -> Tuple[bytes, Tuple[T]]:
         """

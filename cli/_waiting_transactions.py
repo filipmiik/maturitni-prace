@@ -22,4 +22,5 @@ def waiting_transactions() -> None:
     for transaction in transactions:
         date_str = datetime.fromtimestamp(transaction.timestamp / 1000).strftime('%Y-%m-%d %H:%M:%S')
 
+        # TODO: Print from address, to address and amount
         print(f'- {transaction.id().hex()} ({transaction.timestamp}, {date_str})')

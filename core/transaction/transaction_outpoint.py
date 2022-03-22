@@ -51,13 +51,10 @@ class TransactionOutpoint:
         :return: a tuple containing the remaining bytes and the outpoint
         """
 
-        # TODO: Refactor and change some assertions into exceptions due to user input
-        assert isinstance(b, bytes), \
-            'Provided `b` argument has to be of type bytes.'
-        assert len(b) >= 32 + 2, \
-            'Provided `b` argument cannot be deserialized.'
+        from core.helpers import BytesHelper
 
-        b, transaction_id = b[32:], b[:32]
-        b, output_index = b[2:], struct.unpack('>H', b[:2])[0]
+        with BytesHelper.load_safe(b):
+            b, transaction_id = BytesHelper.load_raw_data(b, 32)
+            b, output_index = b[2:], struct.unpack('>H', b[:2])[0]
 
         return b, TransactionOutpoint(transaction_id, output_index)

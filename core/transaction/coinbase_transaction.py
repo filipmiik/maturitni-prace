@@ -47,23 +47,22 @@ class CoinbaseTransaction(Transaction):
 
         from . import TransactionInput, TransactionSignature
 
-        # TODO: Refactor and change some assertions into exceptions due to user input
-        assert isinstance(b, bytes), \
-            'Provided `b` argument has to be of type bytes.'
+        with BytesHelper.load_safe(b):
+            # Load transaction properties
+            b, timestamp = b[8:], struct.unpack('>q', b[:8])
+            b, inputs = BytesHelper.to_array(b, TransactionInput)
 
-        b, timestamp = b[8:], struct.unpack('>q', b[:8])
-        b, inputs = BytesHelper.to_array(b, TransactionInput)
+            if len(inputs) != 0:
+                raise ValueError('Loaded coinbase transaction cannot contain any inputs.')
 
-        assert len(inputs) == 0, \
-            'Parsed input count of coinbase transaction has to be 0.'
+            b, outputs = BytesHelper.to_array(b, TransactionOutput)
 
-        b, outputs = BytesHelper.to_array(b, TransactionOutput)
+            if len(outputs) != 1:
+                raise ValueError('Loaded coinbase transaction must contain only one output.')
 
-        assert len(outputs) == 1, \
-            'Parsed output count of coinbase transaction has to be 1.'
+            b, signatures = BytesHelper.to_array(b, TransactionSignature)
 
-        b, signatures = BytesHelper.to_array(b, TransactionSignature)
-
+        # Create the transaction
         transaction = CoinbaseTransaction(outputs[0].address)
         transaction.timestamp = timestamp
 
