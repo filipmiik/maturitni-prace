@@ -93,21 +93,31 @@ class Block:
             'transactions': tuple(transaction.json() for transaction in self.transactions)
         }
 
-    def unspent_outpoints(self, addresses: Sequence[bytes] = None) -> Dict[TransactionOutpoint, TransactionOutput]:
+    def unspent_outpoints(
+            self,
+            addresses: Sequence[bytes] = None,
+            additional_transactions: Sequence[Transaction] = ()
+    ) -> Dict[TransactionOutpoint, TransactionOutput]:
         """
         Find the unspent outpoints in the whole blockchain.
 
         :param addresses: the addresses to limit the search to, if None all unspent outpoints are found
+        :param additional_transactions: additional out-of-block transactions to add to the search
         :return: a dictionary of outpoints as keys and the referenced transaction outputs as values
         """
 
+        from core.transaction import Transaction
+
         assert addresses is None or all(isinstance(address, bytes) and len(address) == 8 for address in addresses), \
-            'Argument `addresses` must be a sequence of bytes[8].'
+            'Argument `addresses` has to be a sequence of bytes[8].'
+        assert all(isinstance(tx, Transaction) for tx in additional_transactions), \
+            'Argument `additional_transactions` has to be a sequence of Transaction instances.'
 
         from core.transaction import TransactionOutpoint
 
         # Get all transactions in the blockchain to this block
-        transactions = self.expand_transactions()
+        additional_transactions = dict(zip((tx.id() for tx in additional_transactions), additional_transactions))
+        transactions = self.expand_transactions() | additional_transactions
         unspent_outpoints: Dict[TransactionOutpoint, TransactionOutput] = {}
 
         # Iterate over the transactions
@@ -126,15 +136,19 @@ class Block:
 
         return unspent_outpoints
 
-    def valid(self, shallow: bool = True) -> bool:
+    def valid(self, shallow: bool = True, additional_transactions: Sequence[Transaction] = ()) -> bool:
         """
         Check if the block or blockchain is valid.
 
         :param shallow: if True, checks the validity only of this block
+        :param additional_transactions: additional out-of-block transactions to use while validating
         :return: the validity value
         """
 
-        return self.valid_proof(shallow) and self.valid_transactions(shallow)
+        assert isinstance(shallow, bool), \
+            'Argument `shallow` has to be of type bool.'
+
+        return self.valid_proof(shallow) and self.valid_transactions(shallow, additional_transactions)
 
     def valid_proof(self, shallow: bool = True) -> bool:
         """
@@ -143,6 +157,9 @@ class Block:
         :param shallow: if True, checks the validity only of this block
         :return: the validity value
         """
+
+        assert isinstance(shallow, bool), \
+            'Argument `shallow` has to be of type bool.'
 
         # Expand the blockchain to check all blocks if needed
         blocks = (self,) if shallow else self.expand_chain().values()
@@ -155,13 +172,19 @@ class Block:
 
         return True
 
-    def valid_transactions(self, shallow: bool = True) -> bool:
+    def valid_transactions(self, shallow: bool = True, additional_transactions: Sequence[Transaction] = ()) -> bool:
         """
         Check if the block's or blockchain's transactions are valid.
 
         :param shallow: if True, checks the validity only of this block
+        :param additional_transactions: additional out-of-block transactions to use while validating
         :return: the validity value
         """
+
+        assert isinstance(shallow, bool), \
+            'Argument `shallow` has to be of type bool.'
+        assert all(isinstance(tx, Transaction) for tx in additional_transactions), \
+            'Argument `additional_transactions` has to be a sequence of Transaction instances.'
 
         # Expand the blockchain to check transactions per-block if needed
         blocks = (self,) if shallow else self.expand_chain().values()
@@ -171,7 +194,8 @@ class Block:
             transactions = block.transactions
 
             # Check if all transactions are valid
-            if any(not transaction.valid(block.previous_block) for transaction in transactions):
+            if any(not transaction.valid(block.previous_block, additional_transactions)
+                   for transaction in transactions):
                 return False
 
         return True

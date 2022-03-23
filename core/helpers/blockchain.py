@@ -110,7 +110,13 @@ class BlockchainHelper:
 
         # Load transactions from mempool and select only valid ones
         transactions = TransactionHelper.load_transactions()
-        transactions = list(filter(lambda transaction: transaction.valid(latest_block), transactions))
+
+        valid_transactions = []
+        for transaction in transactions:
+            if transaction.valid(latest_block, valid_transactions):
+                valid_transactions.append(transaction)
+
+        transactions = valid_transactions
 
         # Add coinbase transaction to transactions if wallet is specified
         if isinstance(wallet, Wallet):

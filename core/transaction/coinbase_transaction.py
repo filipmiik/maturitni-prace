@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import struct
-from typing import Tuple, TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING, Sequence
 
 from .transaction import Transaction
 from .transaction_output import TransactionOutput
@@ -21,17 +21,20 @@ class CoinbaseTransaction(Transaction):
 
         super().__init__([], [TransactionOutput(address, 10)])
 
-    def valid(self, latest_block: Block | None) -> bool:
+    def valid(self, latest_block: Block | None, additional_transactions: Sequence[Transaction] = ()) -> bool:
         """
         Check if this transaction is valid in blockchain defined by it's latest block.
 
         :param latest_block: the latest block of the checked blockchain or None
+        :param additional_transactions: additional out-of-block transactions to while validating
         """
 
         from core.block import Block
 
         assert latest_block is None or isinstance(latest_block, Block), \
             'Argument `latest_block` has to be an instance of Block or None.'
+        assert all(isinstance(tx, Transaction) for tx in additional_transactions), \
+            'Argument `additional_transactions` has to be a sequence of Transaction instances.'
 
         # Coinbase transaction is always valid
         return True

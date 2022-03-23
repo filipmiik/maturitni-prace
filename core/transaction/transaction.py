@@ -88,20 +88,24 @@ class Transaction:
 
         self.signatures.append(signature)
 
-    def valid(self, latest_block: Block | None) -> bool:
+    def valid(self, latest_block: Block | None, additional_transactions: Sequence[Transaction] = ()) -> bool:
         """
         Check if this transaction is valid in blockchain defined by it's latest block.
 
         :param latest_block: the latest block of the checked blockchain or None
+        :param additional_transactions: additional out-of-block transactions to while validating
         """
 
         from core.block import Block
 
         assert latest_block is None or isinstance(latest_block, Block), \
             'Argument `latest_block` has to be an instance of Block or None.'
+        assert all(isinstance(tx, Transaction) for tx in additional_transactions), \
+            'Argument `additional_transactions` has to be a sequence of Transaction instances.'
 
         # Get unspent outpoints
-        unspent_outpoints = latest_block.unspent_outpoints() if isinstance(latest_block, Block) else {}
+        unspent_outpoints = latest_block.unspent_outpoints(additional_transactions=additional_transactions) \
+            if isinstance(latest_block, Block) else {}
 
         # Check if spending only unspent outpoints and count total available amount
         total_available = 0
