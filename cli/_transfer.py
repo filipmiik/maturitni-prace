@@ -86,4 +86,4 @@ def transfer(
 
     print('\nTransaction:')
     print(f'- {transaction.id().hex()} ({transaction.timestamp}, {date_str})')
-    print(f'\t{amount} units from {from_address} to {to_address}')
+    print(f'\t└ {amount} units from {from_address} to {to_address}')

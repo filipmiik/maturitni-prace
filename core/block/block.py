@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import struct
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from contextlib import suppress
 from hashlib import sha256
 from math import ceil
 from time import time
-from typing import Sequence, Dict, Tuple, List, Any, TYPE_CHECKING
+from typing import Sequence, Dict, Tuple, Any, TYPE_CHECKING
 
 from core.helpers.bytes import BytesHelper
 
@@ -145,7 +145,7 @@ class Block:
         """
 
         # Expand the blockchain to check all blocks if needed
-        blocks = (self,) if shallow else self.expand_chain()
+        blocks = (self,) if shallow else self.expand_chain().values()
 
         # Iterate over blocks:
         for block in blocks:
@@ -164,7 +164,7 @@ class Block:
         """
 
         # Expand the blockchain to check transactions per-block if needed
-        blocks = (self,) if shallow else self.expand_chain()
+        blocks = (self,) if shallow else self.expand_chain().values()
 
         # Iterate over blocks
         for block in blocks:
@@ -176,21 +176,26 @@ class Block:
 
         return True
 
-    def expand_chain(self) -> Tuple[Block]:
+    def expand_chain(self) -> Dict[bytes, Block]:
         """
         Expand the whole blockchain up to this block.
 
         :return: a dictionary of block ids as keys and blocks as values
         """
 
-        blocks: List[Block] = [self]
+        blocks: OrderedDict[bytes, Block] = OrderedDict({
+            self.id(): self
+        })
+        block = self
 
         # Loop while there is a previous block
-        while isinstance(block := blocks[-1].previous_block, Block):
-            blocks.append(block)
+        while isinstance(block := block.previous_block, Block):
+            blocks[block.id()] = block
 
-        # TODO: Remake function to return dictionary for better consistency
-        return tuple(blocks[::-1])
+        # Reverse the dictionary key order to represent timeline
+        blocks = OrderedDict(reversed(blocks.items()))
+
+        return blocks
 
     def expand_transactions(self) -> Dict[bytes, Transaction]:
         """
@@ -202,7 +207,7 @@ class Block:
         transactions = {}
 
         # Iterate over all blocks and extract transactions from them
-        for block in self.expand_chain():
+        for block in self.expand_chain().values():
             for transaction in block.transactions:
                 transactions[transaction.id()] = transaction
 

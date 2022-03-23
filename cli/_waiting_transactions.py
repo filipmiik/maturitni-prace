@@ -13,7 +13,7 @@ def waiting_transactions() -> None:
     # Load transactions from mempool and sort them by timestamps
     print(f'Loading transactions from mempool...')
 
-    transactions = list(TransactionHelper.load_waiting_transactions())
+    transactions = list(TransactionHelper.load_transactions())
     transactions.sort(key=lambda tx: tx.timestamp)
 
     # Print the transactions
@@ -22,5 +22,4 @@ def waiting_transactions() -> None:
     for transaction in transactions:
         date_str = datetime.fromtimestamp(transaction.timestamp / 1000).strftime('%Y-%m-%d %H:%M:%S')
 
-        # TODO: Print from address, to address and amount
         print(f'- {transaction.id().hex()} ({transaction.timestamp}, {date_str})')

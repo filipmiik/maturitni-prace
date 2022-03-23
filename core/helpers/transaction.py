@@ -6,7 +6,7 @@ from core.transaction import Transaction
 
 class TransactionHelper:
     @staticmethod
-    def load_waiting_transactions() -> Set[Transaction]:
+    def load_transactions() -> Set[Transaction]:
         """
         Load transactions from mempool that are waiting to be added to a block.
 
@@ -108,3 +108,30 @@ class TransactionHelper:
         # Save the exported array
         with open('data/mempool.json', 'w') as file:
             json.dump(data, file)
+
+    @staticmethod
+    def remove_transactions(transactions: Iterable[Transaction]) -> None:
+        """
+        Remove provided transaction from mempool.
+
+        :param transactions: the transactions to be removed
+        """
+
+        # Load transactions from mempool
+        saved_transactions = TransactionHelper.load_transactions()
+
+        try:
+            # Convert iterable to list
+            transactions = list(iter(transactions))
+        except TypeError:
+            raise TypeError('Argument `transactions` has to be an iterable of object[Transaction].')
+
+        # Check that all items in transactions are transaction instances
+        assert all(isinstance(tx, Transaction) for tx in transactions), \
+            'Argument `transactions` has to be an iterable of object[Transaction].'
+
+        # Remove provided transactions from loaded transactions
+        saved_transactions = filter(lambda tx: tx not in transactions, saved_transactions)
+
+        # Overwrite mempool with new transactions
+        TransactionHelper.save_transactions(saved_transactions)

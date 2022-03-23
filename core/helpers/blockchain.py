@@ -56,7 +56,7 @@ class BlockchainHelper:
 
         # Save the serialized and expanded blockchain
         with open('data/blockchain.bin', 'wb') as file:
-            file.write(b''.join(bytes(block) for block in latest_block.expand_chain()))
+            file.write(b''.join(bytes(block) for block in latest_block.expand_chain().values()))
 
     @staticmethod
     def export_blockchain(latest_block: Block) -> None:
@@ -73,7 +73,7 @@ class BlockchainHelper:
 
         # Save the serialized and expanded blockchain
         with open('data/blockchain.json', 'w') as file:
-            json.dump(list(block.json() for block in latest_block.expand_chain()), file)
+            json.dump(list(block.json() for block in latest_block.expand_chain().values()), file)
 
     @staticmethod
     def mine_block(
@@ -109,7 +109,7 @@ class BlockchainHelper:
             raise ValueError('Latest block has to be valid.')
 
         # Load transactions from mempool and select only valid ones
-        transactions = TransactionHelper.load_waiting_transactions()
+        transactions = TransactionHelper.load_transactions()
         transactions = list(filter(lambda transaction: transaction.valid(latest_block), transactions))
 
         # Add coinbase transaction to transactions if wallet is specified
@@ -124,7 +124,7 @@ class BlockchainHelper:
             raise Exception('Created block does not contain valid transactions after validation.')
 
         # Declare locked values and constants
-        block_bytes = b''.join(bytes(b) for b in block.expand_chain())
+        block_bytes = b''.join(bytes(b) for b in block.expand_chain().values())
         start = 0
         pending = set()
 
