@@ -80,6 +80,7 @@ def transfer(
     print('Saving transaction into mempool...')
 
     TransactionHelper.save_transaction(transaction)
+    TransactionHelper.export_transaction(transaction)
 
     # Print the created transaction
     date_str = datetime.fromtimestamp(transaction.timestamp / 1000).strftime('%Y-%m-%d %H:%M:%S')

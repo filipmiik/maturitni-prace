@@ -1,4 +1,5 @@
 import json
+from contextlib import suppress
 from typing import Set, Iterable, List, Dict
 
 from core.transaction import Transaction
@@ -76,15 +77,20 @@ class TransactionHelper:
         assert isinstance(transaction, Transaction), \
             'Transaction has to be an instance of Transaction.'
 
-        # Append serialized transaction to the mempool
-        with open('data/mempool.bin', 'w+') as file:
-            # Load current exported data
-            data = json.load(file)
-            if not isinstance(data, List):
-                data = list()
+        # Load serialized transactions from mempool
+        # Two different calls of open() are needed due to json.load not properly working with mode w+
+        data = list()
 
-            # Append the transactions to the exported data and save it
-            data.append(transaction.json())
+        with suppress(FileNotFoundError), \
+                suppress(json.decoder.JSONDecodeError), \
+                open('data/mempool.json', 'r') as file:
+            data = json.load(file)
+
+        # Append serialized transaction to the mempool
+        data.append(transaction.json())
+
+        with open('data/mempool.json', 'w') as file:
+            # Save the transactions
             json.dump(data, file)
 
     @staticmethod
