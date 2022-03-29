@@ -1,4 +1,5 @@
 # Blockchain byte format
+
 ```text
 Block [82 + (14 + 34m + 12n + 558p)q]:
 - prev_id (raw) [32]
@@ -29,3 +30,9 @@ TxSig [558]:
 - scr (raw) [526]
 - sig (raw) [32]
 ```
+
+# Difficulty adjustment
+
+Within this cryptocurrency, difficulty of mining is hardcoded, but can be adjusted inside `core/block/block.py` file
+in `Block::valid_proof()` by changing the number of leading null bytes (the sum of null and full bytes has to always be
+equal to 32).
