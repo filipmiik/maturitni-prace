@@ -137,7 +137,8 @@ class TransactionHelper:
             'Argument `transactions` has to be an iterable of object[Transaction].'
 
         # Remove provided transactions from loaded transactions
-        saved_transactions = filter(lambda tx: tx not in transactions, saved_transactions)
+        saved_transactions = list(filter(lambda tx: tx not in transactions, saved_transactions))
 
         # Overwrite mempool with new transactions
         TransactionHelper.save_transactions(saved_transactions)
+        TransactionHelper.export_transactions(saved_transactions)
